@@ -10,17 +10,12 @@ def main():
     sigmaA = 0.9
 
     # mean and standard deviation set B
-    mB = [-5, -3]
+    mB = [0, -3]
     sigmaB = 0.9
 
-    '''
-    Weights standard deviation, integers?
-
-    '''
-    # standard deviation Weights
+    # Weights initialization
     sigmaW = 0.01
-    dimension = 2
-    weights = InitialWeightMatrix(sigmaW)
+    weights = np.random.standard_normal(3) * sigmaW
     print("Initial weight matrix ", weights, "line k ", weights[0] / weights[1], "\n")
 
     # create the sets, each containing n elements
@@ -36,37 +31,36 @@ def main():
     red_sample1 = remove_samples_randomly(A, B, n, 25, 25)
     red_sample2 = remove_samples_randomly(A, B, n, 50, 0)
     red_sample3 = remove_samples_randomly(A, B, n, 0,  50)
-    red_sample4 = remove_samples_classA(A, n, 20, 80)
-    sample5 = [red_sample4, B]
-    samples = [red_sample1, red_sample2, red_sample3]
+    red_sample4 = remove_samples_classA(A, n, 20, 80), B
+
+    samples = [[A, B], red_sample1, red_sample2, red_sample3, red_sample4]
+
     # all errors and weights for different eta
     allErrors = []
     allWeights = []
-    allMSE = []
 
-
-
+    # all methods to be used
+    learning_methods = [perceptron_learning, delta_learning_online]
     # looping over all eta
-    #learning_methods = [perceptron_learning, delta_learning_online, delta_learning_batch]
-    learning_methods= [perceptron_learning, delta_learning_batch]
-    #classTest = Learning(n, A, B, T, eta)
-    #newWeights = [[], [], []]
     for j in range(len(samples)):
         allErrors.append([])
         allWeights.append([])
         for i in eta:
-            data = perceptron(samples[j][0], samples[j][1], 75, weights, learning_methods, epochs, i)
+            data = perceptron(samples[j][0], samples[j][1], len(np.hstack((samples[j][0], samples[j][1]))[0]), weights, learning_methods, epochs, i)
             allErrors[j].append(data[1])
             allWeights[j].append(data[0])
-            #allMSE.append(data[2])
-    #print("all errors ", allErrors, "\n")
 
+    #Some information
+    #print("all errors ", allErrors, "\n")
     #print("print SHAPE OF ERRORS", np.shape(allErrors), "\n")
     #print("print allErrors before plot: ", allErrors)
 
+    #Plot graphics
     #plot_mapping = ["green", "red", "blue", "--g", "--r", "--b"]
     plot_mapping = ["green", "blue", "--g", "--b"]
     #plot_mapping = ["blue", "--b"]
+
+    #Plotting the results
     x = np.linspace(-10, 10)
     for k in range(len(samples)):
         for j in range(len(eta)):
@@ -79,7 +73,7 @@ def main():
             plt.grid(True)
             plt.plot(samples[k][0][0], samples[k][0][1], 'x', color="green")
             plt.plot(samples[k][1][0], samples[k][1][1], 'x', color="red")
-            plt.ylim([-10, 10])
+            plt.ylim([-5, 5])
 
             # to plot the initial hyperplane (red)
             plt.plot(x, -(weights[2] + weights[0] * x) / weights[1], color = 'black', linewidth=1.5)
@@ -90,7 +84,7 @@ def main():
             # Plot 2
             plt.subplot(1, 2, 2)
             #plt.plot(allErrors[j][0], 'green', allErrors[j][1], 'red', allErrors[j][2], 'blue')
-            plt.plot(allErrors[k][j][0], 'green', allErrors[k][j][1], 'blue',)
+            plt.plot(allErrors[k][j][0], 'green', allErrors[k][j][1], 'blue')
             plt.ylabel('Correct classifications')
             plt.xlabel('epochs')
             plt.title('Correct classifications per epoch')
@@ -100,84 +94,137 @@ def main():
 
 def perceptron(classPos, classNeg, n, weights, learning_methods, epochs, eta=1):
     """
+    THe classical perceptron concept
 
-    :param classPos1: x values for class 1
-    :param classPos2: y values for class 1
-    :param classNeg1: x values for class 2
-    :param classNeg2: y values for class 2
-    :param n: number of data points in each class
-    :param weights: weights of the linear line
-    :param bias: A shifting parameter to move it away from origin
-    :param learning_method: choose either perceptron learning or delta rule
-    :param eta: learning rate
-    :param batch: choose either batch learning or on-line earning
-    :return: weights and errors
+    :param classPos: The coordinates of the positive data in
+    :param classNeg: The coordinates of the negative data
+    :param n: Total number of data points
+    :param weights: A matrix of weights containing w0, w1 and w2
+    :param learning_methods: All learning methods to be used
+    :param epochs: Number of epochs
+    :param eta: Learning rate
+    :return:
     """
 
-    classes = np.vstack((np.hstack((classNeg, classPos)), np.array(2*n * [1])))
-    #classes = np.hstack((classNeg, classPos))
+    classes = np.vstack((np.hstack((classNeg, classPos)), np.array(n * [1])))
+    numberOfDataPos = len((classNeg)[0])
     allWeights = [weights.copy() for i in range(len(learning_methods))]
     allErrors = [[] for i in range(len(learning_methods))]
-    allMSE = [[] for i in range(len(learning_methods))]
-    # add initial vaules to allErrors
+    #allMSE = [[] for i in range(len(learning_methods))]
+
+    # add initial errors
     for i in range(len(learning_methods)):
-        allErrors[i].append(nErrors(allWeights[i], n, classes))
-        allMSE[i].append(MSE(allWeights[i], n, classes))
+        allErrors[i].append(nErrors(allWeights[i], n, classes, numberOfDataPos))
+        #allMSE[i].append(MSE(allWeights[i], n, classes, numberOfDataPos))
+
     for i in range(epochs):
         #Neg: 1 to n, Pos: n+1 to 2n
-        orderSamples = np.random.permutation(2 * n)
+        orderSamples = np.random.permutation(n)
+
         for j in range(len(learning_methods)):
-            learning_methods[j](n, classes, allWeights[j], eta, orderSamples)
-            allErrors[j].append(nErrors(allWeights[j], n, classes))
-            allMSE[j].append(MSE(allWeights[j], n, classes))
+            learning_methods[j](n, classes, allWeights[j], eta, orderSamples, numberOfDataPos)
+            allErrors[j].append(nErrors(allWeights[j], n, classes, numberOfDataPos))
+            #allMSE[j].append(MSE(allWeights[j], n, classes, numberOfDataPos))
 
-    return [allWeights, allErrors, allMSE]
+    return [allWeights, allErrors]
 
 
-def perceptron_learning(n, X, W, eta, permutation):
+def perceptron_learning(n, X, W, eta, permutation, nPos):
+    """
+    Perceptron learning
+
+    :param n: Total number of data points
+    :param X: The coordinates of all data and the bias
+    :param W: A matrix of weights containing w0, w1 and w2
+    :param eta: Learning rate
+    :param permutation: A random permutation of the data points
+    :param nPos: Number of data points in the positive set
+    """
     T = []
     for i in permutation:
-        T.append(i // n)
+        if i < nPos:
+            T.append(1)
+        else:
+            T.append(0)
         W += eta * np.dot(T[-1] - threshold(np.dot(W, X[:, i])), X[:, i])
 
 
-def delta_learning_online(n, X, W, eta, permutation):
+def delta_learning_online(n, X, W, eta, permutation, nPos):
+    """
+    Delta rule online
+
+    :param n: Total number of data points
+    :param X: The coordinates of all data and the bias
+    :param W: A matrix of weights containing w0, w1 and w2
+    :param eta: Learning rate
+    :param permutation: A random permutation of the data points
+    :param nPos: Number of data points in the positive set
+    """
     T = []
     for i in permutation:
-        T.append(((i // n) * 2) - 1)
+        if i < nPos:
+            T.append(1)
+        else:
+            T.append(-1)
         W += eta * (T[-1] - np.dot(np.transpose(W), X[:, i])) * np.transpose(X[:, i])
 
 
-def delta_learning_batch(n, X, W, eta, permutation):
+def delta_learning_batch(n, X, W, eta, permutation, nPos):
+    """
+    Delta rule batch
+
+    :param n: Total number of data points
+    :param X: The coordinates of all data and the bias
+    :param W: A matrix of weights containing w0, w1 and w2
+    :param eta: Learning rate
+    :param permutation: A random permutation of the data points
+    :param nPos: Number of data points in the positive set
+    """
     T = []
     weights_temp = [0, 0, 0]
     #weights_temp = [0, 0]
     for i in permutation:
-        T.append((i // n) * 2 - 1)
+        if i < nPos:
+            T.append(1)
+        else:
+            T.append(-1)
         weights_temp += eta * (T[-1] - np.dot(np.transpose(W), X[:, i])) * np.transpose(X[:, i])
     W += weights_temp
 
 
-def nErrors(W, n, X):
+def nErrors(W, n, X, nPos):
+    """
+    Calculate number of correct classifications
+
+    :param W: A matrix of weights containing w0, w1 and w2
+    :param n: Total number of data points
+    :param X: The coordinates of all data and the bias
+    :param nPos: Number of data points in the positive set
+    :return: number of correct classifications
+    """
     error = 0
     norm = np.sqrt(np.dot(W, W))
-    for i in range(2 * n):
+    for i in range(n):
         projOnW = (np.dot(X[:, (i)], W) / norm ** 2) * W
-        if ((np.dot(projOnW, W) > 0 and i < n) or (np.dot(projOnW, W) <= 0 and i > n - 1)):
+        if ((np.dot(projOnW, W) < 0 and i < nPos) or (np.dot(projOnW, W) >= 0 and i > nPos)):
             error += 1
-    return (2*n - error)
+    return (n - error)
 
-def MSE(W, n, X):
+
+def MSE(W, n, X, nPos):
     MSEerror=0
     norm = np.sqrt(np.dot(W, W))
-    for i in range(2 * n):
+    for i in range(n):
         projOnW = (np.dot(X[:, (i)], W) / norm ** 2) * W
         projOnHyp = W - projOnW
         MSEerror += np.sum(np.sqrt((X[:, (i)]-projOnHyp)**2)) / n
     return MSEerror
 
+
 def remove_samples_randomly(A, B, n, perc_A, perc_B):
     """
+    Specify percentage of data in classes A and B to be removed
+
     :param A: dataset class A
     :param B: dataset class B
     :param perc_A: percentage of A to be removed
@@ -197,6 +244,8 @@ def remove_samples_randomly(A, B, n, perc_A, perc_B):
 
 def remove_samples_classA(A, n, perc_A_1, perc_A_2):
     '''
+    Remove data from class A according to the variables
+
     :param A: samples of class A
     :param n: 100
     :param perc_A_1: percentage to be removed from A<0
@@ -224,10 +273,9 @@ def remove_samples_classA(A, n, perc_A_1, perc_A_2):
     return A_red
 
 
-
-
 def threshold(y):
     """
+    Linear activation function
 
     :param y: A number representing whether a data point is in the correct classification
     :param bias: A shifting parameter to move it away from origin
@@ -249,17 +297,5 @@ def threshold_delta(y):
     return -1
 
 
-def InitialWeightMatrix(sigmaW):
-
-    return np.random.standard_normal(3) * sigmaW
-
-
 if __name__ == '__main__':
     main()
-
-
-'''
-Epochs
-Convergence
-Bias delta rule
-'''
